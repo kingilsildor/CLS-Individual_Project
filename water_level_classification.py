@@ -1,5 +1,4 @@
 import glob
-from typing import List
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -199,67 +198,6 @@ def create_map(df: pd.DataFrame, admin_level: int) -> None:
     plt.tight_layout()
     plt.savefig("map.png")
     plt.show()
-
-
-def calc_difference(
-    df: pd.DataFrame, admin_level: int, n_jobs: int = -1
-) -> pd.DataFrame:
-    """
-    Calculate the difference in Flooded Area and Population Exposed for each unique
-    location and time period combination, using parallel processing.
-    """
-
-    def _calc_difference(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Helper function to calculate differences for a single DataFrame.
-        """
-        df = df.copy()
-        df["Flooded_Area_Diff"] = df["Flooded_Area_SqKM"].diff()
-        df["Population_Exposed_Diff"] = df["Population_Exposed"].diff()
-        df["Days_Passed"] = (df["End_Date"] - df["Start_Date"]).dt.days
-        return df
-
-    def process_location(
-        location: str, location_df: pd.DataFrame
-    ) -> List[pd.DataFrame]:
-        """
-        Process all start dates for a specific location.
-        """
-        start_dates = location_df["Start_Date"].unique()
-
-        location_results = Parallel(n_jobs=n_jobs)(
-            delayed(
-                lambda start_date: [
-                    _calc_difference(
-                        location_df[
-                            (location_df["Start_Date"] == start_date)
-                            & (location_df["End_Date"] == end_date)
-                        ]
-                    )
-                    for end_date in location_df[
-                        location_df["Start_Date"] == start_date
-                    ]["End_Date"].unique()
-                ]
-            )(start_date)
-            for start_date in start_dates
-        )
-
-        return [item for sublist in location_results for item in sublist]
-
-    unique_locations = df[f"Admin{admin_level}"].unique()
-
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(process_location)(location, df[df[f"Admin{admin_level}"] == location])
-        for location in tqdm(
-            unique_locations, desc="Processing locations", unit="location"
-        )
-    )
-
-    # Flatten the results and combine into a single DataFrame
-    result_df = pd.concat(
-        [item for sublist in results for item in sublist], ignore_index=True
-    )
-    return result_df
 
 
 def export_data(df: pd.DataFrame, file_name: str) -> None:
