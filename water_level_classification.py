@@ -1,3 +1,4 @@
+import datetime
 import glob
 
 import cartopy.crs as ccrs
@@ -10,6 +11,19 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 
+def assert_df(df: pd.DataFrame) -> None:
+    """
+    Assert that the given data is a pandas DataFrame and has rows and columns.
+
+    Params
+    ------
+    - df (pd.DataFrame): The data to assert.
+    """
+    assert isinstance(df, pd.DataFrame), "Data is not a pandas DataFrame."
+    assert df.shape[0] > 0, "No data found in the given directory."
+    assert df.shape[1] > 0, "No columns found in the given directory."
+
+
 def load_data(
     dir: str = "../downloaded_files",
     column_sort: list = ["Admin2", "Start_Date", "End_Date", "Flooded_Area_SqKM"],
@@ -20,13 +34,13 @@ def load_data(
 
     Params
     ------
-    dir (str): The directory where the data is stored. Default is "../downloaded_files".
-    column_sort (list): The columns to sort the data by. Default is ["Admin2", "Start_Date", "End_Date", "Flooded_Area_SqKM"].
-    column_asc (list): The order of the columns to sort the data by. Default is [True, True, True, False].
+    - dir (str): The directory where the data is stored. Default is "../downloaded_files".
+    - column_sort (list): The columns to sort the data by. Default is ["Admin2", "Start_Date", "End_Date", "Flooded_Area_SqKM"].
+    - column_asc (list): The order of the columns to sort the data by. Default is [True, True, True, False].
 
     Returns
     -------
-    pd.DataFrame: The sorted data.
+    - pd.DataFrame: The sorted data.
     """
 
     def _load_and_process_csv(file):
@@ -64,12 +78,12 @@ def get_coords(df: pd.DataFrame, admin_level: int) -> dict:
 
     Params
     ------
-    df (pd.DataFrame): The data to get the coordinates from.
-    admin_level (int): The admin level to get the coordinates from. Can only be 1, 2, or 3.
+    - df (pd.DataFrame): The data to get the coordinates from.
+    - admin_level (int): The admin level to get the coordinates from. Can only be 1, 2, or 3.
 
     Returns
     -------
-    dict: The coordinates of the given admin level.
+    - dict: The coordinates of the given admin level.
     """
 
     def _get_location_coords(location):
@@ -113,13 +127,13 @@ def add_coords_to_df(
 
     Params
     ------
-    df (pd.DataFrame): The data to add the coordinates to.
-    coords_dict (dict): The coordinates of the given admin level.
-    admin_level (int): The admin level to add the coordinates to. Can only be 1, 2, or 3.
+    - df (pd.DataFrame): The data to add the coordinates to.
+    - coords_dict (dict): The coordinates of the given admin level.
+    - admin_level (int): The admin level to add the coordinates to. Can only be 1, 2, or 3.
 
     Returns
     -------
-    pd.DataFrame: The data with the coordinates added.
+    - pd.DataFrame: The data with the coordinates added.
     """
     assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
     assert isinstance(df, pd.DataFrame), "Data is not a pandas DataFrame."
@@ -149,8 +163,8 @@ def create_map(df: pd.DataFrame, admin_level: int) -> None:
 
     Params
     ------
-    df (pd.DataFrame): The data to create the map from.
-    admin_level (int): The admin level to create the map from. Can only be 1, 2, or 3.
+    - df (pd.DataFrame): The data to create the map from.
+    - admin_level (int): The admin level to create the map from. Can only be 1, 2, or 3.
     """
 
     def _add_features(ax: plt.Axes) -> None:
@@ -172,9 +186,7 @@ def create_map(df: pd.DataFrame, admin_level: int) -> None:
         )
 
     assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
-    assert isinstance(df, pd.DataFrame), "Data is not a pandas DataFrame."
-    assert df.shape[0] > 0, "No data found in the given directory."
-    assert df.shape[1] > 0, "No columns found in the given directory."
+    assert_df(df)
 
     # Define the map boundaries for Myanmar
     LON_MIN, LON_MAX = 92, 102
@@ -206,12 +218,10 @@ def export_data(df: pd.DataFrame, file_name: str) -> None:
 
     Params
     ------
-    df (pd.DataFrame): The data to export.
-    file_name (str): The name of the file to export the data to.
+    - df (pd.DataFrame): The data to export.
+    - file_name (str): The name of the file to export the data to.
     """
-    assert isinstance(df, pd.DataFrame), "Data is not a pandas DataFrame."
-    assert df.shape[0] > 0, "No data found in the given directory."
-    assert df.shape[1] > 0, "No columns found in the given directory."
+    assert_df(df)
     assert isinstance(file_name, str), "File name is not a string."
 
     df.to_csv(file_name, index=False)
@@ -226,16 +236,14 @@ def transform_datetime(df: pd.DataFrame, column: str) -> pd.DataFrame:
 
     Params
     ------
-    df (pd.DataFrame): The data to transform the column in.
-    column (str): The column to transform to a datetime format.
+    - df (pd.DataFrame): The data to transform the column in.
+    - column (str): The column to transform to a datetime format.
 
     Returns
     -------
-    pd.DataFrame: The data with the column transformed to a datetime format.
+    - pd.DataFrame: The data with the column transformed to a datetime format.
     """
-    assert isinstance(df, pd.DataFrame), "Data is not a pandas DataFrame."
-    assert df.shape[0] > 0, "No data found in the given directory."
-    assert df.shape[1] > 0, "No columns found in the given directory."
+    assert_df(df)
     assert isinstance(column, str), "Column is not a string."
 
     df[column] = pd.to_datetime(df[column])
@@ -243,45 +251,143 @@ def transform_datetime(df: pd.DataFrame, column: str) -> pd.DataFrame:
     return df
 
 
-def categorize_floods(df: pd.DataFrame, bin_size: int) -> pd.DataFrame:
-    """
-    Categorize the floods in the given data into bins based on the given bin size.
+def create_flood_level(df: pd.DataFrame, nbins: int):
+    assert_df(df)
 
-    Params
-    ------
-    df (pd.DataFrame): The data to categorize the floods in.
-    bin_size (int): The size of the bins to categorize the floods into.
+    df = df.copy()
+    max_flood_area = df["Flooded_Area_SqKM"].max()
 
-    Returns
-    -------
-    pd.DataFrame: The data with the floods categorized into bins.
-    """
-    assert isinstance(df, pd.DataFrame), "Data is not a pandas DataFrame."
+    flood_bins = np.linspace(0, max_flood_area, nbins + 1)
 
-    # Create flood bins
-    max_flood = df["Flooded_Area_SqKM"].max()
-    flood_bins = np.linspace(0, max_flood, bin_size).tolist()
-    flood_labels = [f"F{i}" for i in range(1, bin_size)]
-
-    df["Flooded_Area_Category"] = pd.cut(
+    flood_labels = [i for i in range(1, nbins + 1)]
+    df["Flooded_Category"] = pd.cut(
         df["Flooded_Area_SqKM"], bins=flood_bins, labels=flood_labels
     )
-    assert "Flooded_Area_Category" in df.columns, (
-        "Flooded_Area_Category not found in the DataFrame."
+
+    assert "Flooded_Category" in df.columns, (
+        "Flooded_Category column not found in the DataFrame."
     )
     return df
 
 
-def main():
-    # Setup the data
-    flood_df = load_data()
-    coords_dict = get_coords(flood_df, 2)
-    flood_df = add_coords_to_df(flood_df, coords_dict, 2)
-    flood_df = transform_datetime(flood_df, "Start_Date")
-    flood_df = transform_datetime(flood_df, "End_Date")
+def flood_analysis(
+    df: pd.DataFrame, admin_level: int, n_jobs: int = -1
+) -> pd.DataFrame:
+    """
+    Perform flood analysis in parallel for the given data, admin level, location, and number of bins.
 
-    flood_df = categorize_floods(flood_df, 4)
-    export_data(flood_df, "flood_data.csv")
+    Params
+    ------
+    - df (pd.DataFrame): The data to perform the flood analysis on.
+    - admin_level (int): The admin level to perform the flood analysis on. Can only be 1, 2, or 3.
+    - n_jobs (int): The number of jobs to use for the flood analysis. Default is -1.
+
+    Returns
+    -------
+    - pd.DataFrame: The results of the flood analysis.
+    """
+
+    def _process_date(
+        df: pd.DataFrame,
+        date: datetime.date,
+        start_date: datetime.date,
+        admin_level: int,
+        location: str,
+    ) -> pd.DataFrame:
+        """
+        Process the given date for the flood analysis.
+
+        Params
+        ------
+        df (pd.DataFrame): The data to process.
+        date (datetime): The date to process.
+        start_date (datetime): The start date of the data.
+        admin_level (int): The admin level to process.
+        location (str): The location to process.
+
+        Returns
+        -------
+        pd.DataFrame: The results of the flood analysis for the given date.
+        """
+        assert_df(df)
+
+        days_passed = (date - start_date).days
+        df_temp = df[df["End_Date"].dt.date == date]
+
+        # Get the mode of the flood category
+        flood_category_df = (
+            df_temp.groupby(f"Admin{admin_level}")["Flooded_Category"]
+            .agg(lambda x: x.mode()[0] if not x.mode().empty else None)
+            .reset_index()
+        )
+        flood_category_mode = flood_category_df["Flooded_Category"].iloc[0]
+
+        return pd.DataFrame({"#Days": [days_passed], location: [flood_category_mode]})
+
+    def _collect_results(
+        df: pd.DataFrame, admin_level: int, location: str, n_jobs: int
+    ) -> pd.DataFrame:
+        """
+        Collect the results of the flood analysis for the given data, admin level, location, and number of bins.
+
+        Params
+        ------
+        - df (pd.DataFrame): The data to collect the results from.
+        - admin_level (int): The admin level to collect the results from. Can only be 1, 2, or 3.
+        - location (str): The location to collect the results from.
+        - n_jobs (int): The number of jobs to use for the flood analysis.
+
+        Returns
+        -------
+        - pd.DataFrame: The results of the flood analysis.
+        """
+        assert_df(df)
+
+        start_date = df["Start_Date"].dt.date.min()
+        unique_end_dates = df["End_Date"].dt.date.unique()
+
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(_process_date)(df, date, start_date, admin_level, location)
+            for date in unique_end_dates
+        )
+
+        category_df = pd.concat(results, ignore_index=True)
+        return category_df
+
+    assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
+    assert_df(df)
+    locations = df[f"Admin{admin_level}"].unique()
+    flee_df = pd.DataFrame(columns=["#Days"])
+
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(_collect_results)(df, admin_level, location, n_jobs)
+        for location in tqdm(locations, desc="Categorizing floods")
+    )
+
+    for category_df in results:
+        flee_df = flee_df.merge(category_df, on="#Days", how="outer")
+    return flee_df
+
+
+def main():
+    # # Setup the data
+    # flood_df = load_data()
+    # coords_dict = get_coords(flood_df, 2)
+    # flood_df = add_coords_to_df(flood_df, coords_dict, 2)
+    # flood_df = transform_datetime(flood_df, "Start_Date")
+    # flood_df = transform_datetime(flood_df, "End_Date")
+
+    # flood_df = categorize_floods(flood_df, 4)
+    # export_data(flood_df, "flood_data.csv")
+
+    df = pd.read_csv("flood_data.csv")
+    df = create_flood_level(df, nbins)
+    df["Start_Date"] = pd.to_datetime(df["Start_Date"])
+    df["End_Date"] = pd.to_datetime(df["End_Date"])
+
+    data = flood_analysis(df, admin_level=2)
+    export_data(data, "flood_analysis.csv")
+    print(data)
 
 
 if __name__ == "__main__":
