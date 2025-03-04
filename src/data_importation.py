@@ -5,6 +5,7 @@ import pandas as pd
 from geopy.geocoders import Nominatim
 from joblib import Parallel, delayed
 from src.assert_statements import assert_df
+from src.data_exportation import export_data
 from tqdm import tqdm
 
 
@@ -57,14 +58,12 @@ def load_data(
         for file in tqdm(files, desc="Loading dataframes", unit="file")
     )
 
-    data = pd.concat(data_frames)
-    data.sort_values(by=column_sort, ascending=column_asc, inplace=True)
-    data.reset_index(drop=True, inplace=True)
+    data_df = pd.concat(data_frames)
+    data_df.sort_values(by=column_sort, ascending=column_asc, inplace=True)
+    data_df.reset_index(drop=True, inplace=True)
 
-    assert isinstance(data, pd.DataFrame), "Data is not a pandas DataFrame."
-    assert data.shape[0] > 0, "No data found in the given directory."
-    assert data.shape[1] > 0, "No columns found in the given directory."
-    return data
+    assert_df(data_df)
+    return data_df
 
 
 def _get_location_coords(location):
@@ -141,9 +140,7 @@ def add_coords_to_df(
     - pd.DataFrame: The data with the coordinates added.
     """
     assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
-    assert isinstance(df, pd.DataFrame), "Data is not a pandas DataFrame."
-    assert df.shape[0] > 0, "No data found in the given directory."
-    assert df.shape[1] > 0, "No columns found in the given directory."
+    assert_df(df)
     assert isinstance(coords_dict, dict), "Coordinates is not a dictionary."
 
     first_value = next(iter(coords_dict.values()))
@@ -177,3 +174,26 @@ def transform_datetime(df: pd.DataFrame, column: str) -> None:
 
     df[column] = pd.to_datetime(df[column])
     assert df[column].dtype == "datetime64[ns]", "Column was not transformed correctly."
+
+
+def create_df(admin_level: int) -> pd.DataFrame:
+    """
+    Create a DataFrame with the given admin level.
+    Group functions that are used together.
+
+    Params
+    ------
+    - admin_level (int): The admin level to create the DataFrame with.
+
+    Returns
+    -------
+    - pd.DataFrame: The created DataFrame.
+    """
+    flood_df = load_data()
+    coords_dict = get_coords(flood_df, admin_level)
+    flood_df = add_coords_to_df(flood_df, coords_dict, admin_level)
+    flood_df = transform_datetime(flood_df, "Start_Date")
+    flood_df = transform_datetime(flood_df, "End_Date")
+
+    export_data(flood_df, "data/flood_data.csv")
+    return flood_df

@@ -131,7 +131,6 @@ def flood_analysis(
     -------
     - pd.DataFrame: The results of the flood analysis.
     """
-
     assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
     assert_df(df)
     locations = df[f"Admin{admin_level}"].unique()
