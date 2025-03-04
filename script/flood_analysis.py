@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from src.assert_statements import assert_df
+from src.data_exportation import export_data
 from tqdm import tqdm
 
 
@@ -40,6 +41,9 @@ def create_flood_level(
         "Flooded_Category column not found in the DataFrame."
     )
     return df
+
+
+def interpolate_flood_level(df: pd.DataFrame) -> pd.DataFrame: ...
 
 
 def _process_date(
@@ -131,7 +135,7 @@ def flood_analysis(
     assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
     assert_df(df)
     locations = df[f"Admin{admin_level}"].unique()
-    flee_df = pd.DataFrame(columns=["#Days"])
+    data_df = pd.DataFrame(columns=["#Days"])
 
     results = Parallel(n_jobs=n_jobs)(
         delayed(_collect_results)(df, admin_level, location, n_jobs)
@@ -139,5 +143,6 @@ def flood_analysis(
     )
 
     for category_df in results:
-        flee_df = flee_df.merge(category_df, on="#Days", how="outer")
-    return flee_df
+        data_df = data_df.merge(category_df, on="#Days", how="outer")
+    export_data(data_df, "data/flood_analysis.csv")
+    return data_df

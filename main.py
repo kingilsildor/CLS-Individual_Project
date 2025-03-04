@@ -1,6 +1,6 @@
 import pandas as pd
-from script.flood_analysis import create_flood_level, flood_analysis
-from src.data_exportation import export_data
+from script.data_visualization import create_map
+from script.flood_analysis import create_flood_level
 from src.data_importation import transform_datetime
 
 
@@ -20,9 +20,10 @@ def main():
     transform_datetime(df, "Start_Date")
     transform_datetime(df, "End_Date")
 
-    data = flood_analysis(df, admin_level=2)
-    export_data(data, "flood_analysis.csv")
-    print(data)
+    create_map(df, admin_level=2)
+
+    # data = flood_analysis(df, admin_level=2)
+    # print(data)
 
 
 if __name__ == "__main__":
