@@ -217,9 +217,9 @@ def interpolate_df(df: pd.DataFrame, admin_level: int) -> pd.DataFrame:
     assert_df(df)
 
     # Group by the admin level and end date and sum the flooded area to pivot the data
-    pivot_df = df.groupby(["Admin2", "End_Date"])["Flooded_Area_SqKM"].sum().reset_index()
+    pivot_df = df.groupby([f"Admin{admin_level}", "End_Date", "Latitude", "Longitude"])["Flooded_Area_SqKM"].sum().reset_index()
     pivot_df["End_Date"] = pd.to_datetime(pivot_df["End_Date"])
-    pivot_df = pivot_df.pivot(index="Admin2", columns="End_Date", values="Flooded_Area_SqKM")
+    pivot_df = pivot_df.pivot(index=[f"Admin{admin_level}", "Latitude", "Longitude"], columns="End_Date", values="Flooded_Area_SqKM")
 
     full_date_range = pd.date_range(start=pivot_df.columns.min(), end=pivot_df.columns.max(), freq="D")
     pivot_df = pivot_df.reindex(columns=full_date_range, fill_value=np.nan)
@@ -228,4 +228,5 @@ def interpolate_df(df: pd.DataFrame, admin_level: int) -> pd.DataFrame:
     interpolate_df = interpolate_df.reset_index()
     interpolate_df = interpolate_df.round(ROUNDING)
     interpolate_df.fillna(0, inplace=True)
+
     return interpolate_df
