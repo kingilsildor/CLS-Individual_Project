@@ -8,6 +8,8 @@ from src.assert_statements import assert_df
 from src.data_exportation import export_data
 from tqdm import tqdm
 
+from config.config import ROUNDING
+
 
 def _load_and_process_csv(file):
     """
@@ -197,3 +199,33 @@ def create_df(admin_level: int) -> pd.DataFrame:
 
     export_data(flood_df, "data/flood_data.csv")
     return flood_df
+
+def interpolate_df(df: pd.DataFrame, admin_level: int) -> pd.DataFrame:
+    """
+    Interpolate the given data to fill in missing values.
+
+    Params
+    ------
+    - df (pd.DataFrame): The data to interpolate.
+    - admin_level (int): The admin level to interpolate the data for. Can only be 1, 2, or 3.
+
+    Returns
+    -------
+    - pd.DataFrame: The interpolated data.
+    """
+    assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
+    assert_df(df)
+
+    # Group by the admin level and end date and sum the flooded area to pivot the data
+    pivot_df = df.groupby(["Admin2", "End_Date"])["Flooded_Area_SqKM"].sum().reset_index()
+    pivot_df["End_Date"] = pd.to_datetime(pivot_df["End_Date"])
+    pivot_df = pivot_df.pivot(index="Admin2", columns="End_Date", values="Flooded_Area_SqKM")
+
+    full_date_range = pd.date_range(start=pivot_df.columns.min(), end=pivot_df.columns.max(), freq="D")
+    pivot_df = pivot_df.reindex(columns=full_date_range, fill_value=np.nan)
+
+    interpolate_df = pivot_df.interpolate(method="linear", axis=1)
+    interpolate_df = interpolate_df.reset_index()
+    interpolate_df = interpolate_df.round(ROUNDING)
+    interpolate_df.fillna(0, inplace=True)
+    return interpolate_df

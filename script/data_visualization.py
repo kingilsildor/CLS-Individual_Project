@@ -42,8 +42,19 @@ def _add_location(lat: int, lon: int, ax: plt.Axes) -> None:
         transform=ccrs.PlateCarree(),
     )
 
+def _add_flood_area(lat: int, lon: int, ax: plt.Axes) -> None:
+    """
+    Add a location to the given axes.
 
-def create_map(df: pd.DataFrame, admin_level: int) -> None:
+    Params
+    ------
+    - lat (int): The latitude of the location.
+    - lon (int): The longitude of the location.
+    - ax (plt.Axes): The axes to add the location to.
+    """
+
+
+def create_map(df: pd.DataFrame, admin_level: int, date: str = "2024-09-09") -> None:
     """
     Create a map of Myanmar with the locations from the given data.
 
@@ -51,6 +62,7 @@ def create_map(df: pd.DataFrame, admin_level: int) -> None:
     ------
     - df (pd.DataFrame): The data to create the map from.
     - admin_level (int): The admin level to create the map from. Can only be 1, 2, or 3.
+    - date (str): The date to get the flood data from. Default is "2024-09-09".
     """
     assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
     assert_df(df)
@@ -62,6 +74,7 @@ def create_map(df: pd.DataFrame, admin_level: int) -> None:
     coordinates = df[df[f"Admin{admin_level}"].isin(locations)][
         ["Latitude", "Longitude"]
     ]
+    
     coordinates = coordinates.drop_duplicates()
 
     for lat, lon in tqdm(
