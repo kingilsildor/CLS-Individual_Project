@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 from geopy.geocoders import Nominatim
 from joblib import Parallel, delayed
-from src.assert_statements import assert_df
-from src.data_exportation import export_data
 from tqdm import tqdm
 
 from config.config import ROUNDING
+from src.assert_statements import assert_df
+from src.data_exportation import export_data
 
 
 def _load_and_process_csv(file):
@@ -31,7 +31,7 @@ def _load_and_process_csv(file):
 
 
 def load_data(
-    dir: str = "../../downloaded_files",
+    dir: str = "../downloaded_files",
     column_sort: list = ["Admin2", "Start_Date", "End_Date", "Flooded_Area_SqKM"],
     column_asc: list = [True, True, True, False],
 ) -> pd.DataFrame:
@@ -149,11 +149,10 @@ def add_coords_to_df(
     is_valid = isinstance(first_value, tuple) and len(first_value) == 2
     assert is_valid, "Coordinates are not in the correct format."
 
-    df["Latitude"] = df[f"Admin{admin_level}"].apply(
-        lambda x: coords_dict.get(x, (None, None))[0]
-    )
-    df["Longitude"] = df[f"Admin{admin_level}"].apply(
-        lambda x: coords_dict.get(x, (None, None))[1]
+    coords = df[f"Admin{admin_level}"].map(coords_dict)
+    df[["Latitude", "Longitude"]] = pd.DataFrame(
+        coords.apply(lambda x: x if isinstance(x, tuple) else (None, None)).tolist(),
+        index=df.index,
     )
 
     assert "Latitude" in df.columns, "Latitude column not found in the DataFrame."
@@ -194,39 +193,78 @@ def create_df(admin_level: int) -> pd.DataFrame:
     flood_df = load_data()
     coords_dict = get_coords(flood_df, admin_level)
     flood_df = add_coords_to_df(flood_df, coords_dict, admin_level)
+    flood_df = flood_df.dropna()
     flood_df = transform_datetime(flood_df, "Start_Date")
     flood_df = transform_datetime(flood_df, "End_Date")
 
     export_data(flood_df, "data/flood_data.csv")
     return flood_df
 
-def interpolate_df(df: pd.DataFrame, admin_level: int) -> pd.DataFrame:
+
+def pivot_df(
+    df: pd.DataFrame, admin_level: int, interpolate: bool = True
+) -> pd.DataFrame:
     """
-    Interpolate the given data to fill in missing values.
+    Pivot the given data based on the given admin level and interpolate the data if specified.
 
     Params
     ------
-    - df (pd.DataFrame): The data to interpolate.
-    - admin_level (int): The admin level to interpolate the data for. Can only be 1, 2, or 3.
+    - df (pd.DataFrame): The data to pivot.
+    - admin_level (int): The admin level to pivot the data for. Can only be 1, 2, or 3.
+    - interpolate (bool): Whether to interpolate the data. Default is True.
 
     Returns
     -------
-    - pd.DataFrame: The interpolated data.
+    - pd.DataFrame: The pivoted data.
     """
     assert admin_level in [1, 2, 3], "Admin level is not 1, 2, or 3."
     assert_df(df)
 
     # Group by the admin level and end date and sum the flooded area to pivot the data
-    pivot_df = df.groupby([f"Admin{admin_level}", "End_Date", "Latitude", "Longitude"])["Flooded_Area_SqKM"].sum().reset_index()
+    pivot_df = (
+        df.groupby([f"Admin{admin_level}", "End_Date", "Latitude", "Longitude"])[
+            "Flooded_Area_SqKM"
+        ]
+        .sum()
+        .reset_index()
+    )
     pivot_df["End_Date"] = pd.to_datetime(pivot_df["End_Date"])
-    pivot_df = pivot_df.pivot(index=[f"Admin{admin_level}", "Latitude", "Longitude"], columns="End_Date", values="Flooded_Area_SqKM")
+    pivot_df = pivot_df.pivot(
+        index=[f"Admin{admin_level}", "Latitude", "Longitude"],
+        columns="End_Date",
+        values="Flooded_Area_SqKM",
+    )
 
-    full_date_range = pd.date_range(start=pivot_df.columns.min(), end=pivot_df.columns.max(), freq="D")
+    full_date_range = pd.date_range(
+        start=pivot_df.columns.min(), end=pivot_df.columns.max(), freq="D"
+    )
     pivot_df = pivot_df.reindex(columns=full_date_range, fill_value=np.nan)
 
-    interpolate_df = pivot_df.interpolate(method="linear", axis=1)
-    interpolate_df = interpolate_df.reset_index()
-    interpolate_df = interpolate_df.round(ROUNDING)
-    interpolate_df.fillna(0, inplace=True)
+    output_df = pivot_df.copy()
+    if interpolate:
+        interpolate_df = pivot_df.interpolate(method="linear", axis=1)
+        interpolate_df.fillna(0, inplace=True)
+        output_df = interpolate_df
 
-    return interpolate_df
+    output_df.reset_index(inplace=True)
+    output_df.set_index(f"Admin{admin_level}", inplace=True)
+    output_df = output_df.round(ROUNDING)
+    return output_df
+
+
+def filter_columns_by_month(df: pd.DataFrame, month: str) -> pd.DataFrame:
+    """
+    Filters columns in a DataFrame based on whether they contain the specified month.
+
+    Params
+    - df (pd.DataFrame): The input DataFrame.
+    - month (str): The month to filter by in 'YYYY-MM' format (e.g., '2024-07').
+
+    Returns
+    - pd.DataFrame: A DataFrame with only the columns that contain the specified month.
+    """
+    base_columns = ["Latitude", "Longitude"]
+    month_columns = [col for col in df.columns if month in str(col)]
+    filtered_columns = base_columns + month_columns
+
+    return df[filtered_columns]
