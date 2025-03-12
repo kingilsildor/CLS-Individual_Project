@@ -8,6 +8,7 @@ from joblib import Parallel, delayed
 url_formats = [
     "https://www.moezala.gov.mm/sites/default/files/__MACOSX/Daily%20Waterlevel%20Forecast({})-E_Page_{}.jpg",
     "https://www.moezala.gov.mm/sites/default/files/Daily%20Waterlevel%20Forecast({})-E_Page_{}_0.jpg",
+    "https://www.moezala.gov.mm/sites/default/files/Daily%20Waterlevel%20Forecast({})-E_Page_{}.jpg",
 ]
 
 start_date = datetime(2024, 9, 8)
