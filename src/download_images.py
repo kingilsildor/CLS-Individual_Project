@@ -4,20 +4,12 @@ from typing import List, Tuple
 import requests
 from joblib import Parallel, delayed
 
-# Setup
-url_formats = [
-    "https://www.moezala.gov.mm/sites/default/files/__MACOSX/Daily%20Waterlevel%20Forecast({})-E_Page_{}.jpg",
-    "https://www.moezala.gov.mm/sites/default/files/Daily%20Waterlevel%20Forecast({})-E_Page_{}_0.jpg",
-    "https://www.moezala.gov.mm/sites/default/files/Daily%20Waterlevel%20Forecast({})-E_Page_{}.jpg",
-]
-
-start_date = datetime(2024, 9, 8)
-end_date = datetime(2024, 9, 30)
-
-pages = [1, 2]
+# start_date = datetime(2024, 9, 8)
+# end_date = datetime(2024, 9, 30)
+# pages = [1, 2]
 
 
-def download_image(url: str, filename: str) -> None:
+def _download_image(url: str, filename: str) -> None:
     """
     Download the image from the given URL and save it to the specified filename.
 
@@ -37,9 +29,18 @@ def download_image(url: str, filename: str) -> None:
         print(f"❌ Failed: {url}")
 
 
-def generate_download_tasks() -> List[Tuple[str, str]]:
+def generate_download_tasks(
+    start_date: datetime, end_date: datetime, pages: List[int], url_formats: List[str]
+) -> List[Tuple[str, str]]:
     """
     Generate the download tasks for the given date range, pages, and URL formats.
+
+    Params
+    ------
+    - start_date (datetime): The start date of the range.
+    - end_date (datetime): The end date of the range.
+    - pages (List[int]): The pages to download.
+    - url_formats (List[str]): The URL formats to use for the download.
 
     Returns
     -------
@@ -60,8 +61,23 @@ def generate_download_tasks() -> List[Tuple[str, str]]:
     return tasks
 
 
-if __name__ == "__main__":
-    tasks = generate_download_tasks()
+def download_images(start_date: datetime, end_date: datetime, pages: List[int]):
+    """
+    Download the images for the given date range and pages.
+
+    Params
+    ------
+    - start_date (datetime): The start date of the range.
+    - end_date (datetime): The end date of the range.
+    - pages (List[int]): The pages to download.
+    """
+    url_formats = [
+        "https://www.moezala.gov.mm/sites/default/files/__MACOSX/Daily%20Waterlevel%20Forecast({})-E_Page_{}.jpg",
+        "https://www.moezala.gov.mm/sites/default/files/Daily%20Waterlevel%20Forecast({})-E_Page_{}_0.jpg",
+        "https://www.moezala.gov.mm/sites/default/files/Daily%20Waterlevel%20Forecast({})-E_Page_{}.jpg",
+    ]
+
+    tasks = generate_download_tasks(start_date, end_date, pages, url_formats)
     Parallel(n_jobs=-1)(
-        delayed(download_image)(url, filename) for url, filename in tasks
+        delayed(_download_image)(url, filename) for url, filename in tasks
     )

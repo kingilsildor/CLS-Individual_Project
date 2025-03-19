@@ -1,2 +1,5 @@
+cartopy
 joblib
 geopy
+geopandas
+contextily
